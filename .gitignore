@@ -1,0 +1,6 @@
+node_modules
+.env
+.eslintcache
+.next
+dist
+build
