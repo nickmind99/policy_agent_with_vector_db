@@ -2,7 +2,7 @@ import { Document } from "@langchain/core/documents";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
 
-type SupportMime = "application/pdf" | "text/markdown" | "text/plain";
+export type SupportMime = "application/pdf" | "text/markdown" | "text/plain";
 
 interface LoadFileArgs {
   filePath: string;

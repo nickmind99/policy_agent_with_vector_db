@@ -1,7 +1,7 @@
 import { Collection as MongoCollection } from "mongodb";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
-import { getDb } from "../urils/mongo";
-import { embeddings } from "../urils/openai";
+import { getDb } from "../utils/mongo";
+import { embeddings } from "../utils/openai";
 
 const KB_COLLECTION_NAME = "kb_chunks";
 const KB_INDEX_NAME = "kb_vector_index";
