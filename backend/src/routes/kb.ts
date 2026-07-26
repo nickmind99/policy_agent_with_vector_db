@@ -36,7 +36,7 @@ kbRouter.post("/upload", upload.single("file"), async (req, res) => {
     if (!rawDocs.length) {
       return res.status(400).json({
         ok: false,
-        message: "Upsupported or empty file",
+        message: "Unsupported or empty file",
       });
     }
 

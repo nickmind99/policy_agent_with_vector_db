@@ -20,7 +20,7 @@ export const retrieveRelevantResults = async (query: string, namespace: string =
 
   const relevantChunkPairs = await vectorStore.similaritySearchVectorWithScore(embeddedQuery, k, { namespace });
 
-  if (relevantChunkPairs?.length) return {
+  if (!relevantChunkPairs?.length) return {
     docs: [],
     confidence: 0,
   };

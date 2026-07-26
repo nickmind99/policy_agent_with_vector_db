@@ -2,9 +2,7 @@ import { Collection as MongoCollection } from "mongodb";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { getDb } from "../utils/mongo";
 import { embeddings } from "../utils/openai";
-
-const KB_COLLECTION_NAME = "kb_chunks";
-const KB_INDEX_NAME = "kb_vector_index";
+import { env } from "../utils/env";
 
 let collectionPromise: Promise<MongoCollection> | null = null;
 let vectorStorePromise: Promise<MongoDBAtlasVectorSearch> | null = null;
@@ -13,7 +11,7 @@ export const getKbCollection = async (): Promise<MongoCollection> => {
   if (!collectionPromise) {
     collectionPromise = (async () => {
       const db = await getDb();
-      return db.collection(KB_COLLECTION_NAME);
+      return db.collection(env.KB_COLLECTION_NAME);
     })();
   }
 
@@ -29,7 +27,7 @@ export const getVectorStore = async (): Promise<MongoDBAtlasVectorSearch> => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         collection,
-        indexName: KB_INDEX_NAME,
+        indexName: env.KB_VECTOR_SEARCH_INDEX,
         textKey: "text",
         embeddingKey: "embedding",
       });

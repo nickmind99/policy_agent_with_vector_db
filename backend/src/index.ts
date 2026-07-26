@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { kbRouter } from "./routes/kb";
 import { env } from "./utils/env";
+import { agentRouter } from "./routes/agent";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use("/kb", kbRouter);
+app.use("/agent", agentRouter);
 
 const port = Number(env.PORT);
 
