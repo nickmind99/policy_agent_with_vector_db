@@ -1,7 +1,35 @@
-node_modules
+# dependencies
+node_modules/
+
+# env
 .env
+.env.*
+!.env.example
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# caches, test & eval output
 .eslintcache
-.next
-dist
-build
-uploads
+coverage/
+.evalite/
+evalite-report.jsonl
+
+# logs
+*.log
+
+# runtime data
+uploads/
+
+# editors & OS
+.DS_Store
+Thumbs.db
+**/.claude/settings.local.json
+
+# deploy
+.vercel
