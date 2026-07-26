@@ -1,37 +1,16 @@
-import { z } from "zod";
-import { createAgent, providerStrategy } from "langchain";
-import { chatModel } from "../utils/openai";
-import { knowledgeBaseSearchTool } from "./tools";
-import { AGENT_SYSTEM_PROMPT } from "./policy";
+import { agentGraph } from "./graph";
+import { AgentResult } from "./types";
 
-const AgentResponseSchema = z.object({
-  answer: z.string(),
-  citations: z.array(z.object({
-    source: z.string(),
-    chunkId: z.string(),
-    preview: z.string(),
-  })),
-});
+const DEFAULT_NAMESPACE = "default";
 
-type AgentResponse = z.infer<typeof AgentResponseSchema>;
+export const runAgent = async (message: string, namespace: string = DEFAULT_NAMESPACE): Promise<AgentResult> => {
+  const state = await agentGraph.invoke({ question: message, namespace });
 
-const agent = createAgent({
-  model: chatModel,
-  tools: [knowledgeBaseSearchTool],
-  responseFormat: providerStrategy(AgentResponseSchema),
-  systemPrompt: AGENT_SYSTEM_PROMPT,
-});
-
-export const runAgent = async (messages: { role: string; content: string }[]): Promise<AgentResponse> => {
-  const result = await agent.invoke({ messages });
-
-  if (result?.structuredResponse) return {
-    answer: result?.structuredResponse?.answer,
-    citations: result?.structuredResponse?.citations ?? [],
-  };
+  console.log("[agent] plan:", state.subQuestions.map((subQuestion) => subQuestion.query));
 
   return {
-    answer: "",
-    citations: [],
+    answer: state.draft?.answer ?? "",
+    citations: state.draft?.citations ?? [],
+    plan: state.subQuestions,
   };
 };

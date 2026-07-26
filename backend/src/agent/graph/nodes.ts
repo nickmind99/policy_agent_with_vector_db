@@ -1,0 +1,82 @@
+import { z } from "zod";
+import { chatModel } from "../../utils/openai";
+import { retrieveRelevantResults } from "../../kb/retriever";
+import { PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
+import { formatFindings, toContexts } from "../context";
+import { Finding, SubQuestion } from "../types";
+import { AgentStateType, MAX_SUB_QUESTIONS, RETRIEVAL_K, WorkerInput } from "./state";
+
+const PlanSchema = z.object({
+  subQuestions: z.array(z.object({
+    question: z.string(),
+    query: z.string(),
+  })).min(1).max(MAX_SUB_QUESTIONS),
+});
+
+const DraftSchema = z.object({
+  answer: z.string(),
+  citations: z.array(z.object({
+    source: z.string(),
+    chunkId: z.number(),
+    preview: z.string(),
+  })),
+});
+
+const planner = chatModel.withStructuredOutput(PlanSchema, { name: "plan" });
+const synthesizer = chatModel.withStructuredOutput(DraftSchema, { name: "draft" });
+
+export const planNode = async (state: AgentStateType) => {
+  const fallback: SubQuestion[] = [{ id: "sq-0", question: state.question, query: state.question }];
+
+  try {
+    const plan = await planner.invoke([
+      ["system", PLANNER_PROMPT],
+      ["human", state.question],
+    ]);
+
+    const subQuestions = plan.subQuestions.map((item, index) => ({
+      id: `sq-${index}`,
+      question: item.question,
+      query: item.query,
+    }));
+
+    return { subQuestions: subQuestions.length ? subQuestions : fallback };
+  } catch (e) {
+    // the graph must not die because the planner did - degrade to a single search
+    console.log("[plan] planner failed, using the question as is", e);
+
+    return { subQuestions: fallback };
+  }
+};
+
+export const researchNode = async (state: WorkerInput) => {
+  const subQuestion = state.subQuestion;
+
+  if (!subQuestion) return { findings: [] };
+
+  const { docs } = await retrieveRelevantResults(subQuestion.query, state.namespace, RETRIEVAL_K);
+
+  const finding: Finding = {
+    question: subQuestion.question,
+    contexts: toContexts(docs),
+  };
+
+  return { findings: [finding] };
+};
+
+export const synthesizeNode = async (state: AgentStateType) => {
+  const input = [
+    `Original question: ${state.question}`,
+    "",
+    "Retrieved documentation:",
+    "",
+    formatFindings(state.findings),
+  ].join("\n");
+
+  const draft = await synthesizer.invoke([
+    ["system", SYNTHESIZER_PROMPT],
+    ["human", input],
+  ]);
+
+  return { draft };
+};

@@ -6,8 +6,9 @@ export const agentRouter = Router();
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 agentRouter.post("/chat", async (req, res) => {
   try {
-    const { message } = req.body as {
+    const { message, namespace } = req.body as {
       message?: string;
+      namespace?: string;
       threadId?: string;
     };
 
@@ -18,17 +19,13 @@ agentRouter.post("/chat", async (req, res) => {
       });
     }
 
-    const userMsg = {
-      role: "user" as const,
-      content: message.trim(),
-    };
-
-    const { answer, citations } = await runAgent([userMsg]);
+    const { answer, citations, plan } = await runAgent(message.trim(), namespace);
 
     return res.json({
       ok: true,
       answer,
       citations,
+      plan,
     });
   } catch (e) {
     console.log(e);
