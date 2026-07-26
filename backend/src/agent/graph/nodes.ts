@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { chatModel, judgeModel } from "../../utils/openai";
 import { retrieveRelevantResults } from "../../kb/retriever";
-import { GUARD_PROMPT, PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
+import { CHECK_PROMPT, GUARD_PROMPT, PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
 import { formatFindings, toContexts } from "../context";
-import { Finding, SubQuestion } from "../types";
-import { AgentStateType, MAX_SUB_QUESTIONS, RETRIEVAL_K, WorkerInput } from "./state";
+import { Draft, Finding, SubQuestion } from "../types";
+import { AgentStateType, MAX_REVISIONS, MAX_SUB_QUESTIONS, RETRIEVAL_K, WorkerInput } from "./state";
+
+const REFUSAL = "I don't know based on the available documentation.";
 
 const GuardSchema = z.object({
   injection: z.boolean(),
@@ -26,9 +28,15 @@ const DraftSchema = z.object({
   })),
 });
 
+const CheckSchema = z.object({
+  grounded: z.boolean(),
+  issues: z.array(z.string()),
+});
+
 const guard = judgeModel.withStructuredOutput(GuardSchema, { name: "guard" });
 const planner = chatModel.withStructuredOutput(PlanSchema, { name: "plan" });
 const synthesizer = chatModel.withStructuredOutput(DraftSchema, { name: "draft" });
+const checker = judgeModel.withStructuredOutput(CheckSchema, { name: "check" });
 
 export const guardNode = async (state: AgentStateType) => {
   try {
@@ -96,12 +104,60 @@ export const synthesizeNode = async (state: AgentStateType) => {
     "Retrieved documentation:",
     "",
     formatFindings(state.findings),
-  ].join("\n");
+  ];
+
+  if (state.critique.length) {
+    input.push("", "Your previous answer was rejected for:", ...state.critique.map((issue: string) => `- ${issue}`));
+  }
 
   const draft = await synthesizer.invoke([
     ["system", SYNTHESIZER_PROMPT],
-    ["human", input],
+    ["human", input.join("\n")],
   ]);
 
   return { draft };
+};
+
+const findIssues = async (draft: Draft, findings: Finding[]): Promise<string[]> => {
+  const retrieved = new Set(findings.flatMap(
+    (finding) => finding.contexts.map((context) => `${context.source}#${context.chunkId}`),
+  ));
+
+  const invented = draft.citations
+    .filter((citation) => !retrieved.has(`${citation.source}#${citation.chunkId}`))
+    .map((citation) => `Citation "${citation.source}" #${citation.chunkId} was never retrieved.`);
+
+  if (invented.length) return invented;
+
+  try {
+    const verdict = await checker.invoke([
+      ["system", CHECK_PROMPT],
+      ["human", [
+        "Retrieved documentation:",
+        "",
+        formatFindings(findings),
+        "",
+        "Draft answer:",
+        draft.answer,
+      ].join("\n")],
+    ]);
+
+    return verdict.grounded ? [] : verdict.issues;
+  } catch (e) {
+    // fail open: a broken checker must not turn every answer into a refusal
+    console.log("[check] verification failed, accepting the draft", e);
+
+    return [];
+  }
+};
+
+export const checkNode = async (state: AgentStateType) => {
+  const revision = state.revision + 1;
+  const critique = state.draft ? await findIssues(state.draft, state.findings) : [];
+
+  if (critique.length && revision > MAX_REVISIONS) {
+    return { revision, critique, draft: { answer: REFUSAL, citations: [] } };
+  }
+
+  return { revision, critique };
 };

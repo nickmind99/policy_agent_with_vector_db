@@ -3,6 +3,7 @@ import { Draft, Finding, SubQuestion } from "../types";
 
 export const MAX_SUB_QUESTIONS = 4;
 export const RETRIEVAL_K = 2;
+export const MAX_REVISIONS = 1;
 
 export const AgentState = Annotation.Root({
   question: Annotation<string>,
@@ -26,6 +27,14 @@ export const AgentState = Annotation.Root({
   draft: Annotation<Draft | null>({
     reducer: (_prev, next) => next,
     default: () => null,
+  }),
+  critique: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+  revision: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
   }),
 });
 

@@ -79,6 +79,21 @@ Fields:
            -> query "mid-cycle subscription cancellation refund policy".
 `.trim();
 
+export const CHECK_PROMPT = `
+You verify a draft answer written by a documentation Q&A agent.
+
+You are given the documentation chunks that were retrieved and the draft answer built from
+them.
+
+Set "grounded" to false if the draft states anything the chunks do not support - especially
+prices, limits, dates, feature names and policies.
+
+Saying "the documentation does not cover this" is always grounded.
+
+In "issues" list what exactly is unsupported, one short line each. Leave it empty when
+"grounded" is true.
+`.trim();
+
 export const SYNTHESIZER_PROMPT = `
 You are the Docs & FAQ Agent.
 
@@ -98,6 +113,8 @@ Rules for "answer":
 - If no sub-question has any supporting chunk, answer exactly:
   "I don't know based on the available documentation."
 - Short, clear, user-friendly.
+- If issues from your previous attempt are listed, fix exactly those issues. Drop any claim
+  you cannot support instead of rewording it.
 
 Rules for "citations":
 - One entry per supporting chunk you relied on.
