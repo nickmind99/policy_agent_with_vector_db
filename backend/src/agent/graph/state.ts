@@ -3,7 +3,7 @@ import { Draft, Finding, SubQuestion } from "../types";
 
 export const MAX_SUB_QUESTIONS = 4;
 export const RETRIEVAL_K = 2;
-export const MAX_REVISIONS = 1;
+export const MAX_REVISIONS = 3;
 
 export const AgentState = Annotation.Root({
   question: Annotation<string>,
