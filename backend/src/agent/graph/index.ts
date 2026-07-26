@@ -1,16 +1,18 @@
-// START -> plan -> Send x N -> research -> synthesize -> END
-
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { AgentState } from "./state";
-import { planNode, researchNode, synthesizeNode } from "./nodes";
+import { gateNode, guardNode, planNode, researchNode, synthesizeNode } from "./nodes";
 import { fanOutToWorkers } from "./routes";
 
 export const agentGraph = new StateGraph(AgentState)
+  .addNode("guard", guardNode)
   .addNode("plan", planNode)
+  .addNode("gate", gateNode)
   .addNode("research", researchNode, { retryPolicy: { maxAttempts: 3 } })
   .addNode("synthesize", synthesizeNode)
+  .addEdge(START, "guard")
   .addEdge(START, "plan")
-  .addConditionalEdges("plan", fanOutToWorkers, ["research"])
+  .addEdge(["guard", "plan"], "gate")
+  .addConditionalEdges("gate", fanOutToWorkers, ["research", END])
   .addEdge("research", "synthesize")
   .addEdge("synthesize", END)
   .compile();

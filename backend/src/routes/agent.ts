@@ -19,13 +19,20 @@ agentRouter.post("/chat", async (req, res) => {
       });
     }
 
-    const { answer, citations, plan } = await runAgent(message.trim(), namespace);
+    const result = await runAgent(message.trim(), namespace);
+
+    if (result.blocked) {
+      return res.status(400).json({
+        ok: false,
+        message: "Your question does not comply with our policy rules",
+      });
+    }
 
     return res.json({
       ok: true,
-      answer,
-      citations,
-      plan,
+      answer: result.answer,
+      citations: result.citations,
+      plan: result.plan,
     });
   } catch (e) {
     console.log(e);

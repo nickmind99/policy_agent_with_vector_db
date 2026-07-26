@@ -7,6 +7,12 @@ export const chatModel = new ChatOpenAI({
   openAIApiKey: env.OPENAI_API_KEY,
 });
 
+export const judgeModel = new ChatOpenAI({
+  model: "gpt-4o-mini",
+  temperature: 0,
+  openAIApiKey: env.OPENAI_API_KEY,
+});
+
 export const embeddings = new OpenAIEmbeddings({
   model: "text-embedding-3-small",
   apiKey: env.OPENAI_API_KEY,

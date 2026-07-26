@@ -29,8 +29,6 @@ export interface Draft {
   citations: Citation[];
 }
 
-export interface AgentResult {
-  answer: string;
-  citations: Citation[];
-  plan: SubQuestion[];
-}
+export type AgentResult
+  = | { blocked: false; answer: string; citations: Citation[]; plan: SubQuestion[] }
+    | { blocked: true };

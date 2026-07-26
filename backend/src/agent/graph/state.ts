@@ -7,6 +7,10 @@ export const RETRIEVAL_K = 2;
 export const AgentState = Annotation.Root({
   question: Annotation<string>,
   namespace: Annotation<string>,
+  injectionDetected: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
   subQuestions: Annotation<SubQuestion[]>({
     reducer: (_prev, next) => next,
     default: () => [],

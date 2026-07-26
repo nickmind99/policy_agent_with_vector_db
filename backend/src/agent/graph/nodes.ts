@@ -1,10 +1,14 @@
 import { z } from "zod";
-import { chatModel } from "../../utils/openai";
+import { chatModel, judgeModel } from "../../utils/openai";
 import { retrieveRelevantResults } from "../../kb/retriever";
-import { PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
+import { GUARD_PROMPT, PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
 import { formatFindings, toContexts } from "../context";
 import { Finding, SubQuestion } from "../types";
 import { AgentStateType, MAX_SUB_QUESTIONS, RETRIEVAL_K, WorkerInput } from "./state";
+
+const GuardSchema = z.object({
+  injection: z.boolean(),
+});
 
 const PlanSchema = z.object({
   subQuestions: z.array(z.object({
@@ -22,8 +26,29 @@ const DraftSchema = z.object({
   })),
 });
 
+const guard = judgeModel.withStructuredOutput(GuardSchema, { name: "guard" });
 const planner = chatModel.withStructuredOutput(PlanSchema, { name: "plan" });
 const synthesizer = chatModel.withStructuredOutput(DraftSchema, { name: "draft" });
+
+export const guardNode = async (state: AgentStateType) => {
+  try {
+    const verdict = await guard.invoke([
+      ["system", GUARD_PROMPT],
+      ["human", state.question],
+    ]);
+
+    return { injectionDetected: verdict.injection };
+  } catch (e) {
+    // fail open: an OpenAI hiccup must not block real users
+    console.log("[guard] check failed, letting the question through", e);
+
+    return { injectionDetected: false };
+  }
+};
+
+// joins guard and plan: a branch reads the state as of the start of its own superstep,
+// so the guard verdict is only visible from a node that waits for both
+export const gateNode = () => ({});
 
 export const planNode = async (state: AgentStateType) => {
   const fallback: SubQuestion[] = [{ id: "sq-0", question: state.question, query: state.question }];
