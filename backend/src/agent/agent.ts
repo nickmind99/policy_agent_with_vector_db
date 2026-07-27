@@ -1,10 +1,14 @@
 import { agentGraph } from "./graph";
-import { AgentResult } from "./types";
+import { AgentResult, ChatMessage } from "./types";
 
 const DEFAULT_NAMESPACE = "default";
 
-export const runAgent = async (message: string, namespace: string = DEFAULT_NAMESPACE): Promise<AgentResult> => {
-  const state = await agentGraph.invoke({ question: message, namespace });
+export const runAgent = async (
+  message: string,
+  namespace: string = DEFAULT_NAMESPACE,
+  history: ChatMessage[] = [],
+): Promise<AgentResult> => {
+  const state = await agentGraph.invoke({ question: message, namespace, history });
 
   if (state.injectionDetected) return { blocked: true };
 

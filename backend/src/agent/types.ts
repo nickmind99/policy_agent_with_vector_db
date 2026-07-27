@@ -1,3 +1,11 @@
+export type ChatRole = "assistant" | "user";
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  ts?: Date;
+}
+
 export interface RetrievedContext {
   source: string;
   chunkId: number;

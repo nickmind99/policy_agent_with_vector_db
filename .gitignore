@@ -13,6 +13,7 @@ build/
 out/
 *.tsbuildinfo
 next-env.d.ts
+.idea/
 
 # caches, test & eval output
 .eslintcache

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { chatModel, judgeModel } from "../../utils/openai";
 import { retrieveRelevantResults } from "../../kb/retriever";
 import { CHECK_PROMPT, GUARD_PROMPT, PLANNER_PROMPT, SYNTHESIZER_PROMPT } from "../policy";
-import { formatFindings, toContexts } from "../context";
+import { formatFindings, formatHistory, toContexts } from "../context";
 import { Draft, Finding, SubQuestion } from "../types";
 import { AgentStateType, MAX_REVISIONS, MAX_SUB_QUESTIONS, RETRIEVAL_K, WorkerInput } from "./state";
 
@@ -61,10 +61,20 @@ export const gateNode = () => ({});
 export const planNode = async (state: AgentStateType) => {
   const fallback: SubQuestion[] = [{ id: "sq-0", question: state.question, query: state.question }];
 
+  const input = state?.history?.length
+    ? [
+        "Conversation so far:",
+        "",
+        formatHistory(state.history),
+        "",
+        `Current question: ${state.question}`,
+      ].join("\n")
+    : state.question;
+
   try {
     const plan = await planner.invoke([
       ["system", PLANNER_PROMPT],
-      ["human", state.question],
+      ["human", input],
     ]);
 
     const subQuestions = plan.subQuestions.map((item, index) => ({
@@ -75,7 +85,6 @@ export const planNode = async (state: AgentStateType) => {
 
     return { subQuestions: subQuestions.length ? subQuestions : fallback };
   } catch (e) {
-    // the graph must not die because the planner did - degrade to a single search
     console.log("[plan] planner failed, using the question as is", e);
 
     return { subQuestions: fallback };
@@ -105,6 +114,10 @@ export const synthesizeNode = async (state: AgentStateType) => {
     "",
     formatFindings(state.findings),
   ];
+
+  if (state.history.length) {
+    input.unshift("Conversation so far:", "", formatHistory(state.history), "");
+  }
 
   if (state.critique.length) {
     input.push("", "Your previous answer was rejected for:", ...state.critique.map((issue: string) => `- ${issue}`));
@@ -144,7 +157,6 @@ const findIssues = async (draft: Draft, findings: Finding[]): Promise<string[]> 
 
     return verdict.grounded ? [] : verdict.issues;
   } catch (e) {
-    // fail open: a broken checker must not turn every answer into a refusal
     console.log("[check] verification failed, accepting the draft", e);
 
     return [];

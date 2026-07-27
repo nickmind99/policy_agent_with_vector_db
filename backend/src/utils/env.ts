@@ -8,8 +8,9 @@ const EnvSchema = z.object({
   PORT: z.string().default("5000"),
   MONGODB_ATLAS_URI: z.string().min(1, "MongoDB uri is needed"),
   MONGODB_DB_NAME: z.string().min(1, "MongoDB db name is needed"),
-  KB_COLLECTION_NAME: z.string().min(1, "MongoDB collection is needed"),
+  KB_COLLECTION_NAME: z.string().min(1, "MongoDB kb collection is needed"),
   KB_VECTOR_SEARCH_INDEX: z.string().min(1, "MongoDB vector search index is needed"),
+  CONVERSATIONS_COLLECTION_NAME: z.string().min(1, "MongoDB conversation collection is needed"),
 });
 
 const parsedEnv = EnvSchema.safeParse(process.env);
@@ -25,4 +26,5 @@ export const env = Object.freeze({
   MONGODB_DB_NAME: envData.MONGODB_DB_NAME,
   KB_COLLECTION_NAME: envData.KB_COLLECTION_NAME,
   KB_VECTOR_SEARCH_INDEX: envData.KB_VECTOR_SEARCH_INDEX,
+  CONVERSATIONS_COLLECTION_NAME: envData.CONVERSATIONS_COLLECTION_NAME,
 });

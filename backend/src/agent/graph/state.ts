@@ -1,5 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import { Draft, Finding, SubQuestion } from "../types";
+import { ChatMessage, Draft, Finding, SubQuestion } from "../types";
 
 export const MAX_SUB_QUESTIONS = 4;
 export const RETRIEVAL_K = 2;
@@ -8,6 +8,10 @@ export const MAX_REVISIONS = 3;
 export const AgentState = Annotation.Root({
   question: Annotation<string>,
   namespace: Annotation<string>,
+  history: Annotation<ChatMessage[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
   injectionDetected: Annotation<boolean>({
     reducer: (_prev, next) => next,
     default: () => false,

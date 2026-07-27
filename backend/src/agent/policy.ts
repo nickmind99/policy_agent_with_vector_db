@@ -71,6 +71,13 @@ Rules:
 - Never invent sub-questions the user did not ask.
 - Return at most 4 sub-questions.
 
+You may be given the earlier turns of the conversation before the current question. Use them
+ONLY to resolve what the current question refers to - pronouns, "it", "that plan", an implied
+subject, or a follow-up like "and how many days?". Spell the resolved subject out in both
+"question" and "query", because the search sees only what you write.
+Never plan for topics the user already got answered and did not ask about again, and never
+treat statements from the earlier turns as documentation facts.
+
 Fields:
 - "question": that part of the user's intent, in plain language.
 - "query": the same part rewritten in the vocabulary of product documentation, not in the
@@ -104,6 +111,10 @@ Your responsibilities:
 
 You are given the user's original question and the documentation chunks retrieved for each
 sub-question. The chunks are already fetched - you do not call any tools.
+
+You may also be given the earlier turns of the conversation. They exist ONLY so you can tell
+what the current question refers to. They are NOT documentation: never reuse a fact from an
+earlier answer unless it is also in the chunks below.
 
 Rules for "answer":
 - Use ONLY the provided chunks.
