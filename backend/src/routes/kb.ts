@@ -3,6 +3,8 @@ import multer from "multer";
 import { loadFileAsDocuments, SupportMime } from "../kb/loaders";
 import { splitDocuments } from "../kb/splitters";
 import { ingestDocuments } from "../kb/ingest";
+import { DEFAULT_NAMESPACE } from "../utils/constants";
+import { fail } from "../utils/http";
 
 export const kbRouter = Router();
 
@@ -16,13 +18,10 @@ const upload = multer({
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 kbRouter.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    const namespace = "default";
+    const namespace = DEFAULT_NAMESPACE;
 
     if (!req.file) {
-      return res.status(400).json({
-        ok: false,
-        message: "No file uploaded.Please upload a file before proceeding!",
-      });
+      return fail(res, 400, "No file uploaded.Please upload a file before proceeding!");
     }
     // dummy.pdf
     const { path, mimetype, originalname } = req.file;
@@ -34,20 +33,13 @@ kbRouter.post("/upload", upload.single("file"), async (req, res) => {
     });
 
     if (!rawDocs.length) {
-      return res.status(400).json({
-        ok: false,
-        message: "Unsupported or empty file",
-      });
+      return fail(res, 400, "Unsupported or empty file");
     }
 
     const chunks = await splitDocuments(rawDocs);
 
     if (!chunks.length) {
-      return res.status(400).json({
-        ok: false,
-        message:
-          "File loaded but produced no usable chunks after splitting is done",
-      });
+      return fail(res, 400, "File loaded but produced no usable chunks after splitting is done");
     }
 
     // ingest to our vector store
@@ -60,9 +52,6 @@ kbRouter.post("/upload", upload.single("file"), async (req, res) => {
       sources: summary.sources,
     });
   } catch {
-    return res.status(500).json({
-      message: "Something went wrong while uploading the file",
-      ok: false,
-    });
+    return fail(res, 500, "Something went wrong while uploading the file");
   }
 });

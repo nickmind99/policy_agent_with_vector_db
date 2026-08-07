@@ -3,36 +3,23 @@ import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { getDb } from "../utils/mongo";
 import { embeddings } from "../utils/openai";
 import { env } from "../utils/env";
+import { lazy } from "../utils/lazy";
 
-let collectionPromise: Promise<MongoCollection> | null = null;
-let vectorStorePromise: Promise<MongoDBAtlasVectorSearch> | null = null;
+export const getKbCollection = lazy<MongoCollection>(async () => {
+  const db = await getDb();
 
-export const getKbCollection = async (): Promise<MongoCollection> => {
-  if (!collectionPromise) {
-    collectionPromise = (async () => {
-      const db = await getDb();
-      return db.collection(env.KB_COLLECTION_NAME);
-    })();
-  }
+  return db.collection(env.KB_COLLECTION_NAME);
+});
 
-  return collectionPromise;
-};
+export const getVectorStore = lazy<MongoDBAtlasVectorSearch>(async () => {
+  const collection = await getKbCollection();
 
-export const getVectorStore = async (): Promise<MongoDBAtlasVectorSearch> => {
-  if (!vectorStorePromise) {
-    vectorStorePromise = (async () => {
-      const collection = await getKbCollection();
-
-      return new MongoDBAtlasVectorSearch(embeddings, {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        collection,
-        indexName: env.KB_VECTOR_SEARCH_INDEX,
-        textKey: "text",
-        embeddingKey: "embedding",
-      });
-    })();
-  }
-
-  return vectorStorePromise;
-};
+  return new MongoDBAtlasVectorSearch(embeddings, {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    collection,
+    indexName: env.KB_VECTOR_SEARCH_INDEX,
+    textKey: "text",
+    embeddingKey: "embedding",
+  });
+});

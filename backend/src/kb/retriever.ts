@@ -1,6 +1,7 @@
 // question -> [Retriever] -> retrieve relevant chunks
 
 import { Document } from "@langchain/core/documents";
+import { DEFAULT_NAMESPACE } from "../utils/constants";
 import { getVectorStore } from "./vectorStore";
 
 export interface RetrieverResult {
@@ -8,11 +9,14 @@ export interface RetrieverResult {
   confidence: number;
 }
 
-export const retrieveRelevantResults = async (query: string, namespace: string = "default", k: number = 2) => {
-  if (!query?.trim()) return {
-    docs: [],
-    confidence: 0,
-  };
+const emptyResult = (): RetrieverResult => ({ docs: [], confidence: 0 });
+
+export const retrieveRelevantResults = async (
+  query: string,
+  namespace: string = DEFAULT_NAMESPACE,
+  k: number = 2,
+): Promise<RetrieverResult> => {
+  if (!query?.trim()) return emptyResult();
 
   const vectorStore = await getVectorStore();
 
@@ -20,10 +24,7 @@ export const retrieveRelevantResults = async (query: string, namespace: string =
 
   const relevantChunkPairs = await vectorStore.similaritySearchVectorWithScore(embeddedQuery, k, { namespace });
 
-  if (!relevantChunkPairs?.length) return {
-    docs: [],
-    confidence: 0,
-  };
+  if (!relevantChunkPairs?.length) return emptyResult();
 
   const docs = relevantChunkPairs.map(([doc]) => doc);
 

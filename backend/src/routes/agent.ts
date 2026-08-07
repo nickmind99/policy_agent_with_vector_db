@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { runAgent } from "../agent/agent";
 import { appendToHistory, ensureThreadId, getConversation } from "../agent/memory";
+import { fail } from "../utils/http";
 
 export const agentRouter = Router();
 
@@ -14,10 +15,7 @@ agentRouter.post("/chat", async (req, res) => {
     };
 
     if (!message || !message.trim()) {
-      return res.status(400).json({
-        ok: false,
-        message: "Message is required",
-      });
+      return fail(res, 400, "Message is required");
     }
 
     const question = message.trim();
@@ -28,11 +26,7 @@ agentRouter.post("/chat", async (req, res) => {
     const result = await runAgent(question, namespace, history);
 
     if (result.blocked) {
-      return res.status(400).json({
-        ok: false,
-        threadId,
-        message: "Your question does not comply with our policy rules",
-      });
+      return fail(res, 400, "Your question does not comply with our policy rules", { threadId });
     }
 
     await appendToHistory(
@@ -50,9 +44,7 @@ agentRouter.post("/chat", async (req, res) => {
     });
   } catch (e) {
     console.log(e);
-    return res.status(500).json({
-      ok: false,
-      message: "Some error occurred",
-    });
+
+    return fail(res, 500, "Some error occurred");
   }
 });
