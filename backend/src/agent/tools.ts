@@ -1,10 +1,18 @@
 import { z } from "zod";
 import { tool } from "langchain";
-import { retrieveRelevantResults } from "../kb/retriever";
+import { retrieveRelevantResults, RetrieverResult } from "../kb/retriever";
 
-export const knowledgeBaseSearchTool = tool(
+export type KnowledgeBaseRetriever = (
+  query: string,
+  namespace?: string,
+  k?: number,
+) => Promise<RetrieverResult>;
+
+export const makeKnowledgeBaseSearchTool = (
+  retrieve: KnowledgeBaseRetriever = retrieveRelevantResults,
+) => tool(
   async ({ question, namespace }) => {
-    const { docs, confidence } = await retrieveRelevantResults(question, namespace || "default");
+    const { docs, confidence } = await retrieve(question, namespace || "default");
 
     const contexts = docs.map((doc) => {
       const source = (doc?.metadata?.source as string) || "unknown source";
@@ -28,3 +36,5 @@ export const knowledgeBaseSearchTool = tool(
     }),
   },
 );
+
+export const knowledgeBaseSearchTool = makeKnowledgeBaseSearchTool();
