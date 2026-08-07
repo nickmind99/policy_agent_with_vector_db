@@ -5,41 +5,25 @@ export const MAX_SUB_QUESTIONS = 4;
 export const RETRIEVAL_K = 2;
 export const MAX_REVISIONS = 3;
 
+const lastValue = <T>(defaultValue: () => T) => Annotation<T>({
+  reducer: (_prev: T, next: T) => next,
+  default: defaultValue,
+});
+
 export const AgentState = Annotation.Root({
   question: Annotation<string>,
   namespace: Annotation<string>,
-  history: Annotation<ChatMessage[]>({
-    reducer: (_prev, next) => next,
-    default: () => [],
-  }),
-  injectionDetected: Annotation<boolean>({
-    reducer: (_prev, next) => next,
-    default: () => false,
-  }),
-  subQuestions: Annotation<SubQuestion[]>({
-    reducer: (_prev, next) => next,
-    default: () => [],
-  }),
-  subQuestion: Annotation<SubQuestion | null>({
-    reducer: (_prev, next) => next,
-    default: () => null,
-  }),
+  history: lastValue<ChatMessage[]>(() => []),
+  injectionDetected: lastValue<boolean>(() => false),
+  subQuestions: lastValue<SubQuestion[]>(() => []),
+  subQuestion: lastValue<SubQuestion | null>(() => null),
   findings: Annotation<Finding[]>({
     reducer: (prev, next) => prev.concat(next),
     default: () => [],
   }),
-  draft: Annotation<Draft | null>({
-    reducer: (_prev, next) => next,
-    default: () => null,
-  }),
-  critique: Annotation<string[]>({
-    reducer: (_prev, next) => next,
-    default: () => [],
-  }),
-  revision: Annotation<number>({
-    reducer: (_prev, next) => next,
-    default: () => 0,
-  }),
+  draft: lastValue<Draft | null>(() => null),
+  critique: lastValue<string[]>(() => []),
+  revision: lastValue<number>(() => 0),
 });
 
 export type AgentStateType = typeof AgentState.State;

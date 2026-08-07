@@ -2,6 +2,7 @@ import { Collection } from "mongodb";
 import { nanoid } from "nanoid";
 import { env } from "../utils/env";
 import { getDb } from "../utils/mongo";
+import { lazy } from "../utils/lazy";
 import { ChatMessage } from "./types";
 
 export interface ConversationDoc {
@@ -11,22 +12,14 @@ export interface ConversationDoc {
   updatedAt: Date;
 }
 
-let conversationCollectionPromise: Promise<Collection<ConversationDoc>> | null = null;
+const getConversationCollection = lazy<Collection<ConversationDoc>>(async () => {
+  const db = await getDb();
+  const collection = db.collection<ConversationDoc>(env.CONVERSATIONS_COLLECTION_NAME);
 
-const getConversationCollection = async (): Promise<Collection<ConversationDoc>> => {
-  if (!conversationCollectionPromise) {
-    conversationCollectionPromise = (async () => {
-      const db = await getDb();
-      const collection = db.collection<ConversationDoc>(env.CONVERSATIONS_COLLECTION_NAME);
+  await collection.createIndex({ threadId: 1 }, { unique: true });
 
-      await collection.createIndex({ threadId: 1 }, { unique: true });
-
-      return collection;
-    })();
-  }
-
-  return conversationCollectionPromise;
-};
+  return collection;
+});
 
 export const ensureThreadId = async (threadId?: string): Promise<string> => {
   const collection = await getConversationCollection();

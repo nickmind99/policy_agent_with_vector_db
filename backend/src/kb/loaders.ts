@@ -10,6 +10,14 @@ interface LoadFileArgs {
   originalName: string;
 }
 
+const withSource = (docs: Document[], source: string): Document[] => docs.map((doc) => ({
+  ...doc,
+  metadata: {
+    ...doc.metadata,
+    source,
+  },
+}));
+
 export const loadFileAsDocuments = async (args: LoadFileArgs): Promise<Document[]> => {
   const { filePath,
     mimeType,
@@ -24,29 +32,15 @@ export const loadFileAsDocuments = async (args: LoadFileArgs): Promise<Document[
   const isPdf = ext === "pdf" || mimeType === "application/pdf";
 
   if (isPdf) {
-    const loader = new PDFLoader(filePath);
-    const docs = await loader.load();
+    const docs = await new PDFLoader(filePath).load();
 
-    return docs.map((doc) => ({
-      ...doc,
-      metadata: {
-        ...doc.metadata,
-        source: originalName,
-      },
-    }));
+    return withSource(docs, originalName);
   }
 
   if (isTxt || isMarkdown) {
-    const loader = new TextLoader(filePath);
-    const docs = await loader.load();
+    const docs = await new TextLoader(filePath).load();
 
-    return docs.map((doc) => ({
-      ...doc,
-      metadata: {
-        ...doc.metadata,
-        source: originalName,
-      },
-    }));
+    return withSource(docs, originalName);
   }
 
   return [];

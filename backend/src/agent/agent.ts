@@ -1,7 +1,6 @@
+import { DEFAULT_NAMESPACE } from "../utils/constants";
 import { agentGraph } from "./graph";
 import { AgentResult, ChatMessage } from "./types";
-
-const DEFAULT_NAMESPACE = "default";
 
 export const runAgent = async (
   message: string,
