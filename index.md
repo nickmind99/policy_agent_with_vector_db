@@ -39,11 +39,11 @@ only to resolve references — never as a source of facts.
 graph LR
     client[HTTP client] --> api[Express API]
     api --> ingest[Ingestion pipeline]
-    api --> graph[Agent graph]
+    api --> agent[Agent graph]
     ingest --> atlas[(MongoDB Atlas<br/>vector store)]
-    graph --> atlas
-    graph --> mongo[(MongoDB<br/>conversations)]
-    graph --> openai[OpenAI<br/>chat + embeddings]
+    agent --> atlas
+    agent --> mongo[(MongoDB<br/>conversations)]
+    agent --> openai[OpenAI<br/>chat + embeddings]
     ingest --> openai
 ```
 
