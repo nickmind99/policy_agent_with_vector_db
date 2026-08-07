@@ -1,0 +1,417 @@
+openapi: 3.1.0
+
+info:
+  title: Policy Agent with Vector DB API
+  version: 1.0.0
+  summary: HTTP API for a grounded documentation Q&A agent backed by MongoDB Atlas Vector Search.
+  description: |
+    The Policy Agent API exposes the two operations implemented by the Express server in
+    `backend/src`: ingesting documents into the knowledge base, and asking the agent a question.
+
+    The agent answers only from documents that were uploaded to the knowledge base. When the
+    retrieved chunks do not support an answer, it replies
+    `I don't know based on the available documentation.` rather than guessing.
+
+    Every chat response carries a `threadId`. Send it back on the next request to continue the
+    same conversation; omit it to start a new one.
+  license:
+    name: ISC
+    identifier: ISC
+
+servers:
+  - url: http://localhost:{port}
+    description: Local development server started with `npm run dev` in `backend/`.
+    variables:
+      port:
+        default: '5000'
+        description: Value of the `PORT` environment variable, which defaults to `5000`.
+
+# The Express app mounts no authentication or authorization middleware, and CORS is open to every
+# origin. An empty root-level requirement states that explicitly: no operation requires credentials.
+security: []
+
+tags:
+  - name: Knowledge base
+    description: |
+      Ingestion of source documents. Uploaded files are parsed, split into overlapping chunks,
+      embedded, and written to the vector store.
+  - name: Agent
+    description: |
+      Question answering over the ingested knowledge base, including conversation threads.
+
+paths:
+  /kb/upload:
+    post:
+      operationId: uploadKnowledgeBaseFile
+      summary: Upload a document to the knowledge base
+      description: |
+        Uploads a single file, parses it into documents, splits it into chunks of roughly 800
+        characters with 150 characters of overlap, embeds the chunks, and stores them in the
+        vector store.
+
+        Accepted formats are PDF, plain text, and Markdown, identified by the file extension
+        (`.pdf`, `.txt`, `.md`, `.markdown`) or the uploaded MIME type. A file that matches none of
+        them produces no documents and is rejected.
+
+        The target namespace is hardcoded to `default` in `backend/src/routes/kb.ts`; the request
+        cannot select one.
+      tags:
+        - Knowledge base
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+            examples:
+              pdf:
+                summary: Upload a PDF price list
+                value:
+                  file: pricing.pdf
+      responses:
+        '200':
+          description: The file was ingested and its chunks were written to the vector store.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+              examples:
+                ingested:
+                  summary: Twelve chunks ingested from one source
+                  value:
+                    ok: true
+                    namespace: default
+                    totalChunks: 12
+                    sources:
+                      - pricing.pdf
+        '400':
+          description: |
+            No file was attached, the file format is unsupported or empty, or splitting produced no
+            usable chunks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                noFile:
+                  summary: No file attached to the request
+                  value:
+                    ok: false
+                    message: No file uploaded.Please upload a file before proceeding!
+                unsupported:
+                  summary: Unsupported or empty file
+                  value:
+                    ok: false
+                    message: Unsupported or empty file
+                noChunks:
+                  summary: File parsed but produced no chunks
+                  value:
+                    ok: false
+                    message: File loaded but produced no usable chunks after splitting is done
+        '500':
+          description: Parsing, embedding, or the write to the vector store failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                failed:
+                  summary: Unhandled ingestion failure
+                  value:
+                    ok: false
+                    message: Something went wrong while uploading the file
+
+  /agent/chat:
+    post:
+      operationId: chatWithAgent
+      summary: Ask the agent a question
+      description: |
+        Runs the question through the agent graph: an injection guard, a planner that splits the
+        question into at most four sub-questions, parallel retrieval against the vector store, a
+        synthesis step that writes one answer with citations, and a verification step that rejects
+        unsupported claims and triggers a rewrite.
+
+        The user message and the resulting answer are appended to the conversation thread, so the
+        next request that carries the same `threadId` can resolve references such as "that plan".
+        An unknown `threadId` is not an error: a new thread is created and its id is returned.
+      tags:
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              newThread:
+                summary: First question in a new conversation
+                value:
+                  message: How much does the Pro plan cost?
+              followUp:
+                summary: Follow-up question in an existing conversation
+                value:
+                  message: And how many projects does it include?
+                  namespace: default
+                  threadId: V1StGXR8_Z5j
+      responses:
+        '200':
+          description: The agent produced an answer. Its citations reference retrieved chunks only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                answered:
+                  summary: Answer grounded in one chunk
+                  value:
+                    ok: true
+                    threadId: V1StGXR8_Z5j
+                    answer: Pro costs 29 USD per user per month.
+                    citations:
+                      - source: pricing.md
+                        chunkId: 3
+                        preview: 'Pro: 29 USD per user per month, billed monthly.'
+                    plan:
+                      - id: sq-0
+                        question: What is the price of the Pro plan?
+                        query: Pro plan pricing per user per month
+                refused:
+                  summary: Documentation does not cover the question
+                  value:
+                    ok: true
+                    threadId: V1StGXR8_Z5j
+                    answer: I don't know based on the available documentation.
+                    citations: []
+                    plan:
+                      - id: sq-0
+                        question: Does the product support SAML?
+                        query: SAML single sign-on support
+        '400':
+          description: |
+            The `message` field is missing or blank, or the injection guard rejected the question.
+            The guard response includes the `threadId` that was created or resolved for the
+            request; the validation response does not.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingMessage:
+                  summary: Missing or blank message
+                  value:
+                    ok: false
+                    message: Message is required
+                blocked:
+                  summary: Question rejected by the injection guard
+                  value:
+                    ok: false
+                    threadId: V1StGXR8_Z5j
+                    message: Your question does not comply with our policy rules
+        '500':
+          description: The agent run failed, for example because a model or database call errored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                failed:
+                  summary: Unhandled agent failure
+                  value:
+                    ok: false
+                    message: Some error occurred
+
+components:
+  schemas:
+    UploadRequest:
+      type: object
+      title: Upload request
+      description: Multipart form carrying exactly one file.
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The document to ingest. PDF, plain text, or Markdown.
+      examples:
+        - file: pricing.pdf
+
+    UploadResponse:
+      type: object
+      title: Upload response
+      description: Summary of what was written to the vector store.
+      required:
+        - ok
+        - namespace
+        - totalChunks
+        - sources
+      properties:
+        ok:
+          type: boolean
+          description: Always `true` on a successful ingestion.
+        namespace:
+          type: string
+          description: Namespace the chunks were written to. Currently always `default`.
+        totalChunks:
+          type: integer
+          minimum: 0
+          description: Number of chunks embedded and stored.
+        sources:
+          type: array
+          description: Distinct source file names found in the ingested chunks.
+          items:
+            type: string
+      examples:
+        - ok: true
+          namespace: default
+          totalChunks: 12
+          sources:
+            - pricing.pdf
+
+    ChatRequest:
+      type: object
+      title: Chat request
+      description: A question for the agent, optionally scoped to a namespace and a thread.
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          description: The user's question. Rejected with `400` when missing or whitespace only.
+        namespace:
+          type: string
+          default: default
+          description: |
+            Knowledge base namespace to search. Defaults to `default` when omitted, which is the
+            only namespace the upload endpoint writes to.
+        threadId:
+          type: string
+          description: |
+            Identifier of an existing conversation thread. Omit it to start a new thread. An
+            identifier with no matching thread is replaced by a newly created one.
+      examples:
+        - message: How much does the Pro plan cost?
+          namespace: default
+          threadId: V1StGXR8_Z5j
+
+    ChatResponse:
+      type: object
+      title: Chat response
+      description: The agent's answer, the chunks it relied on, and the plan it followed.
+      required:
+        - ok
+        - threadId
+        - answer
+        - citations
+        - plan
+      properties:
+        ok:
+          type: boolean
+          description: Always `true` on a successful run.
+        threadId:
+          type: string
+          description: |
+            Identifier of the conversation thread this turn was appended to. Send it back on the
+            next request to continue the conversation.
+        answer:
+          type: string
+          description: |
+            The answer, grounded in the retrieved chunks. Equals
+            `I don't know based on the available documentation.` when nothing supports an answer.
+        citations:
+          type: array
+          description: |
+            One entry per chunk the answer relied on. Empty when the agent could not ground an
+            answer. Citations pointing at chunks that were never retrieved are rejected before the
+            response is returned.
+          items:
+            $ref: '#/components/schemas/Citation'
+        plan:
+          type: array
+          description: Sub-questions the planner derived from the question, in execution order.
+          items:
+            $ref: '#/components/schemas/SubQuestion'
+      examples:
+        - ok: true
+          threadId: V1StGXR8_Z5j
+          answer: Pro costs 29 USD per user per month.
+          citations:
+            - source: pricing.md
+              chunkId: 3
+              preview: 'Pro: 29 USD per user per month, billed monthly.'
+          plan:
+            - id: sq-0
+              question: What is the price of the Pro plan?
+              query: Pro plan pricing per user per month
+
+    Citation:
+      type: object
+      title: Citation
+      description: A reference to a single chunk that supports the answer.
+      required:
+        - source
+        - chunkId
+        - preview
+      properties:
+        source:
+          type: string
+          description: File name the chunk was ingested from.
+        chunkId:
+          type: integer
+          description: Index of the chunk within its ingestion run.
+        preview:
+          type: string
+          description: Excerpt of the chunk, truncated at 400 characters, supporting the answer.
+      examples:
+        - source: pricing.md
+          chunkId: 3
+          preview: 'Pro: 29 USD per user per month, billed monthly.'
+
+    SubQuestion:
+      type: object
+      title: Sub-question
+      description: One unit of research derived from the user's question.
+      required:
+        - id
+        - question
+        - query
+      properties:
+        id:
+          type: string
+          description: Positional identifier, `sq-0` through `sq-3`.
+        question:
+          type: string
+          description: The part of the user's intent this sub-question covers, in plain language.
+        query:
+          type: string
+          description: |
+            The same part rewritten in documentation vocabulary, used as the vector search query.
+      examples:
+        - id: sq-0
+          question: What is the price of the Pro plan?
+          query: Pro plan pricing per user per month
+
+    Error:
+      type: object
+      title: Error
+      description: |
+        Error shape returned by both endpoints. `threadId` is present only on a chat request that
+        got as far as resolving a thread before being rejected.
+      required:
+        - ok
+        - message
+      properties:
+        ok:
+          type: boolean
+          const: false
+          description: Always `false` on an error.
+        message:
+          type: string
+          description: Human-readable description of what went wrong.
+        threadId:
+          type: string
+          description: Conversation thread the rejected request belonged to, when one was resolved.
+      examples:
+        - ok: false
+          message: Message is required

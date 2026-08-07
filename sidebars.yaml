@@ -1,0 +1,16 @@
+- page: index.md
+  label: Overview
+
+- group: Documentation
+  expanded: true
+  items:
+    - page: docs/architecture.md
+      label: Architecture
+    - page: docs/api-guide.md
+      label: API guide
+
+- group: API reference
+  expanded: true
+  items:
+    - page: openapi.yaml
+      label: Policy Agent API

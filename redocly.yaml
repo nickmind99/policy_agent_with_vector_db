@@ -1,0 +1,18 @@
+# Redocly project configuration.
+# Docs: https://redocly.com/docs/realm/config
+
+seo:
+  title: Policy Agent with Vector DB
+
+apis:
+  policy-agent@v1:
+    root: ./openapi.yaml
+
+extends:
+  - recommended
+
+rules:
+  # The backend only ever binds to localhost — `PORT` defaults to 5000 and there is no deployed
+  # environment in this repository. Naming a public host would be an invention, so the rule that
+  # forbids localhost servers is turned off rather than worked around.
+  no-server-example.com: off
